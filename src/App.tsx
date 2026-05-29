@@ -75,6 +75,13 @@ const initialUsers: User[] = [
   { id: 1, name: 'Admin User', email: 'admin@gmail.com', password: '1234' },
 ]
 
+const initialActivities: Activity[] = [
+  { id: 1, title: 'Tesla Model 3 added', status: 'Ready', progress: 92, timestamp: 'Today · 09:00 AM', description: 'New car added to fleet' },
+  { id: 2, title: 'BMW i4 added', status: 'Inspection', progress: 78, timestamp: 'Today · 08:40 AM', description: 'New car added to fleet' },
+  { id: 3, title: 'Toyota Corolla added', status: 'Available', progress: 100, timestamp: 'Today · 08:10 AM', description: 'New car added to fleet' },
+  { id: 4, title: 'Ford Mustang added', status: 'Maintenance', progress: 60, timestamp: 'Today · 07:50 AM', description: 'New car added to fleet' },
+]
+
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => sessionStorage.getItem('psg_logged_in') === 'true')
   const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(() => sessionStorage.getItem('psg_current_user') || null)
@@ -83,65 +90,44 @@ function App() {
     return role === 'admin' || role === 'user' ? role : null
   })
 
-  const [users, setUsers] = useState<User[]>(() => {
-    const saved = localStorage.getItem('psg_users')
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved) as User[]
-        const hasAdmin = parsed.some((user) => user.email.toLowerCase() === 'admin@gmail.com')
-        return hasAdmin ? parsed : [...initialUsers, ...parsed]
-      } catch {
-        return initialUsers
-      }
-    }
-    return initialUsers
-  })
-
-  const [cars, setCars] = useState<Car[]>(() => {
-    const saved = localStorage.getItem('psg_cars')
-    if (saved) {
-      try {
-        return JSON.parse(saved) as Car[]
-      } catch {
-        return initialCars
-      }
-    }
-    return initialCars
-  })
-
-  const [activities, setActivities] = useState<Activity[]>(() => {
-    const saved = localStorage.getItem('psg_activities')
-    if (saved) {
-      try {
-        return JSON.parse(saved) as Activity[]
-      } catch {
-        return [
-          { id: 1, title: 'Tesla Model 3 added', status: 'Ready', progress: 92, timestamp: 'Today · 09:00 AM', description: 'New car added to fleet' },
-          { id: 2, title: 'BMW i4 added', status: 'Inspection', progress: 78, timestamp: 'Today · 08:40 AM', description: 'New car added to fleet' },
-          { id: 3, title: 'Toyota Corolla added', status: 'Available', progress: 100, timestamp: 'Today · 08:10 AM', description: 'New car added to fleet' },
-          { id: 4, title: 'Ford Mustang added', status: 'Maintenance', progress: 60, timestamp: 'Today · 07:50 AM', description: 'New car added to fleet' },
-        ]
-      }
-    }
-    return [
-      { id: 1, title: 'Tesla Model 3 added', status: 'Ready', progress: 92, timestamp: 'Today · 09:00 AM', description: 'New car added to fleet' },
-      { id: 2, title: 'BMW i4 added', status: 'Inspection', progress: 78, timestamp: 'Today · 08:40 AM', description: 'New car added to fleet' },
-      { id: 3, title: 'Toyota Corolla added', status: 'Available', progress: 100, timestamp: 'Today · 08:10 AM', description: 'New car added to fleet' },
-      { id: 4, title: 'Ford Mustang added', status: 'Maintenance', progress: 60, timestamp: 'Today · 07:50 AM', description: 'New car added to fleet' },
-    ]
-  })
+  const [isLoading, setIsLoading] = useState(true)
+  const [serverError, setServerError] = useState<string | null>(null)
+  const [users, setUsers] = useState<User[]>(initialUsers)
+  const [cars, setCars] = useState<Car[]>(initialCars)
+  const [activities, setActivities] = useState<Activity[]>(initialActivities)
 
   useEffect(() => {
-    localStorage.setItem('psg_cars', JSON.stringify(cars))
-  }, [cars])
+    const fetchData = async () => {
+      try {
+        const [usersRes, carsRes, activitiesRes] = await Promise.all([
+          fetch('/api/users'),
+          fetch('/api/cars'),
+          fetch('/api/activities'),
+        ])
 
-  useEffect(() => {
-    localStorage.setItem('psg_activities', JSON.stringify(activities))
-  }, [activities])
+        if (!usersRes.ok || !carsRes.ok || !activitiesRes.ok) {
+          throw new Error('Failed to load backend data')
+        }
 
-  useEffect(() => {
-    localStorage.setItem('psg_users', JSON.stringify(users))
-  }, [users])
+        const [usersData, carsData, activitiesData] = await Promise.all([
+          usersRes.json(),
+          carsRes.json(),
+          activitiesRes.json(),
+        ])
+
+        setUsers(usersData)
+        setCars(carsData)
+        setActivities(activitiesData)
+      } catch (error) {
+        console.error(error)
+        setServerError('Unable to connect to the backend. Using fallback local data.')
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [])
 
   useEffect(() => {
     sessionStorage.setItem('psg_logged_in', String(isLoggedIn))
@@ -169,37 +155,71 @@ function App() {
     setCurrentUserRole(null)
   }
 
-  const handleSignUp = (userData: Omit<User, 'id'>) => {
-    const nextId = users.length ? Math.max(...users.map((user) => user.id)) + 1 : 1
-    setUsers((prevUsers) => [...prevUsers, { id: nextId, ...userData }])
-    setIsLoggedIn(true)
-    setCurrentUserEmail(userData.email)
-    setCurrentUserRole('user')
+  const handleSignUp = async (userData: Omit<User, 'id'>) => {
+    try {
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(userData),
+      })
+
+      if (!response.ok) {
+        const errorBody = await response.json()
+        throw new Error(errorBody.message || 'Unable to create account.')
+      }
+
+      const newUser = await response.json()
+      setUsers((prevUsers) => [...prevUsers, newUser])
+      setIsLoggedIn(true)
+      setCurrentUserEmail(newUser.email)
+      setCurrentUserRole('user')
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Unable to create account.')
+    }
   }
 
-  const addCar = (carData: Omit<Car, 'id'>) => {
-    const nextId = cars.length ? Math.max(...cars.map((car) => car.id)) + 1 : 1
-    const newCar = { id: nextId, ...carData }
-    setCars((prevCars) => [...prevCars, newCar])
-    setActivities((prevActivities) => [
-      ...prevActivities,
-      {
-        id: prevActivities.length ? Math.max(...prevActivities.map((activity) => activity.id)) + 1 : 1,
-        title: `${newCar.make} ${newCar.model} added`,
-        status: 'Added',
-        progress: 100,
-        timestamp: new Date().toLocaleString('en-US', {
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true,
-        }),
-        description: 'New car added to fleet',
-      },
-    ])
+  const addCar = async (carData: Omit<Car, 'id'>) => {
+    try {
+      const response = await fetch('/api/cars', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(carData),
+      })
+
+      if (!response.ok) {
+        const errorBody = await response.json()
+        throw new Error(errorBody.message || 'Unable to save car.')
+      }
+
+      const result = await response.json()
+      setCars((prevCars) => [...prevCars, result.car])
+      setActivities((prevActivities) => [...prevActivities, result.activity])
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Unable to save car.')
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 px-6 py-10 text-slate-900">
+        <div className="mx-auto max-w-xl rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+          <p className="text-center text-lg font-semibold">Loading fleet data…</p>
+        </div>
+      </div>
+    )
   }
 
   return (
     <>
+      {serverError ? (
+        <div className="mx-auto my-4 max-w-3xl rounded-3xl border border-amber-200 bg-amber-50 px-6 py-4 text-amber-900 shadow-sm">
+          <p className="text-sm font-medium">{serverError}</p>
+        </div>
+      ) : null}
       <Routes>
         <Route path="/" element={<Home />} />
         <Route

@@ -1,5 +1,3 @@
-import React from 'react'
-
 function Home() {
   return (
     <div className="relative overflow-hidden bg-slate-950 text-white">
