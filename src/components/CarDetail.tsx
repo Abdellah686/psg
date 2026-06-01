@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useNavigate, useParams, Link } from 'react-router-dom'
 import type { Car } from '../App'
 
 type CarDetailProps = {
   cars: Car[]
+  onDeleteCar: (id: number) => void
 }
 
 const fallbackFeatures = [
@@ -32,8 +33,9 @@ const reviews = [
   },
 ]
 
-function CarDetail({ cars }: CarDetailProps) {
+function CarDetail({ cars, onDeleteCar }: CarDetailProps) {
   const [reserved, setReserved] = useState(false)
+  const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
   const carId = Number(id)
   const car = useMemo(() => cars.find((item) => item.id === carId), [cars, carId])
@@ -70,12 +72,24 @@ function CarDetail({ cars }: CarDetailProps) {
                 Experience the ultimate blend of electric performance and luxury comfort. This premium vehicle is ready for any trip, from city cruising to weekend escapes.
               </p>
             </div>
-            <Link
-              to="/cars"
-              className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-slate-100 px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-200"
-            >
-              Back to cars
-            </Link>
+            <div className="flex flex-wrap gap-3">
+              <Link
+                to="/cars"
+                className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-slate-100 px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-200"
+              >
+                Back to cars
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  onDeleteCar(car.id)
+                  navigate('/cars')
+                }}
+                className="inline-flex items-center justify-center rounded-full bg-rose-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-500"
+              >
+                Delete car
+              </button>
+            </div>
           </div>
         </div>
 

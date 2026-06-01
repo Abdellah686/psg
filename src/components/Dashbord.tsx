@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { Activity } from '../App'
+import type { Activity, Car } from '../App'
 
 type StatsCard = {
   label: string
@@ -16,12 +16,15 @@ type DashbordProps = {
     color: string
     image: string
   }) => void
+  onDeleteCar: (id: number) => void
   onLogout: () => void
   carCount: number
+  cars: Car[]
   activities: Activity[]
+  liveStatus: 'connecting' | 'connected' | 'disconnected'
 }
 
-function Dashbord({ onAddCar, onLogout, carCount, activities }: DashbordProps) {
+function Dashbord({ onAddCar, onDeleteCar, onLogout, carCount, cars, activities, liveStatus }: DashbordProps) {
   const recentCars = activities.slice(-4).reverse()
   const navigate = useNavigate()
   const [showCreateForm, setShowCreateForm] = useState(false)
@@ -200,6 +203,63 @@ function Dashbord({ onAddCar, onLogout, carCount, activities }: DashbordProps) {
             </div>
           ))}
         </div>
+
+        <section className="rounded-3xl bg-white p-6 shadow-sm">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Fleet cars</h2>
+              <p className="mt-1 text-sm text-slate-500">Manage your fleet and delete cars directly from the dashboard.</p>
+            </div>
+            <span
+              className={`rounded-full px-3 py-1 text-sm font-medium ${
+                liveStatus === 'connected'
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : liveStatus === 'connecting'
+                  ? 'bg-amber-100 text-amber-700'
+                  : 'bg-slate-100 text-slate-500'
+              }`}
+            >
+              {liveStatus === 'connected' ? 'Live' : liveStatus === 'connecting' ? 'Connecting' : 'Offline'}
+            </span>
+          </div>
+
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {cars.length === 0 ? (
+              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6 text-center text-slate-500">
+                No cars in your fleet yet.
+              </div>
+            ) : (
+              cars.map((car) => (
+                <div key={car.id} className="rounded-3xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
+                  <div className="relative overflow-hidden rounded-3xl bg-slate-100">
+                    <img
+                      src={car.image}
+                      alt={`${car.make} ${car.model}`}
+                      className="h-48 w-full object-cover"
+                      onError={(event) => {
+                        event.currentTarget.src = 'https://via.placeholder.com/900x480?text=Car+image+not+available'
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => onDeleteCar(car.id)}
+                      className="absolute right-4 top-4 rounded-full bg-rose-600 px-3 py-2 text-xs font-semibold text-white shadow-lg transition hover:bg-rose-500"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                  <div className="mt-4 flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">{car.make} {car.model}</p>
+                      <p className="mt-1 text-sm text-slate-500">{car.year} • {car.color}</p>
+                    </div>
+                    <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700">#{car.id}</span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
 
         <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
           <section className="rounded-3xl bg-white p-6 shadow-sm">

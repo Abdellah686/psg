@@ -95,6 +95,7 @@ function App() {
   const [users, setUsers] = useState<User[]>(initialUsers)
   const [cars, setCars] = useState<Car[]>(initialCars)
   const [activities, setActivities] = useState<Activity[]>(initialActivities)
+  const [liveStatus, setLiveStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting')
 
   useEffect(() => {
     const fetchData = async () => {
@@ -142,6 +143,53 @@ function App() {
       sessionStorage.removeItem('psg_user_role')
     }
   }, [isLoggedIn, currentUserEmail, currentUserRole])
+
+  useEffect(() => {
+    let socket: WebSocket | null = null
+    let reconnectTimer: number | undefined
+
+    const connect = () => {
+      setLiveStatus('connecting')
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+      socket = new WebSocket(`${protocol}//localhost:4000`)
+
+      socket.addEventListener('open', () => {
+        setLiveStatus('connected')
+      })
+
+      socket.addEventListener('message', (event) => {
+        try {
+          const data = JSON.parse(event.data)
+          if (data.type === 'sync') {
+            setCars(data.cars)
+            setActivities(data.activities)
+          }
+        } catch (error) {
+          console.warn('Invalid WS message', error)
+        }
+      })
+
+      socket.addEventListener('close', () => {
+        setLiveStatus('disconnected')
+        reconnectTimer = window.setTimeout(connect, 3000)
+      })
+
+      socket.addEventListener('error', () => {
+        setLiveStatus('disconnected')
+      })
+    }
+
+    connect()
+
+    return () => {
+      if (socket) {
+        socket.close()
+      }
+      if (reconnectTimer) {
+        window.clearTimeout(reconnectTimer)
+      }
+    }
+  }, [])
 
   const handleLogin = (email: string, role: UserRole) => {
     setIsLoggedIn(true)
@@ -203,6 +251,32 @@ function App() {
     }
   }
 
+  const deleteCar = async (carId: number) => {
+    try {
+      const response = await fetch(`/api/cars/${carId}`, { method: 'DELETE' })
+      const responseText = await response.text()
+
+      if (!response.ok) {
+        let errorMessage = 'Unable to delete car.'
+        try {
+          const errorBody = JSON.parse(responseText)
+          errorMessage = errorBody.message || errorMessage
+        } catch {
+          errorMessage = responseText || errorMessage
+        }
+        throw new Error(errorMessage)
+      }
+
+      const result = responseText ? JSON.parse(responseText) : {}
+      setCars((prevCars) => prevCars.filter((car) => car.id !== carId))
+      if (result.activity) {
+        setActivities((prevActivities) => [...prevActivities, result.activity])
+      }
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Unable to delete car.')
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-50 px-6 py-10 text-slate-900">
@@ -259,14 +333,22 @@ function App() {
         <Route
           path="/cars/:id"
           element={
-            isLoggedIn ? <CarDetail cars={cars} /> : <Navigate to="/login" replace />
+            isLoggedIn ? <CarDetail cars={cars} onDeleteCar={deleteCar} /> : <Navigate to="/login" replace />
           }
         />
         <Route
           path="/dashbord"
           element={
             isLoggedIn && currentUserRole === 'admin' ? (
-              <Dashbord onAddCar={addCar} onLogout={handleLogout} carCount={cars.length} activities={activities} />
+              <Dashbord
+                onAddCar={addCar}
+                onLogout={handleLogout}
+                onDeleteCar={deleteCar}
+                carCount={cars.length}
+                cars={cars}
+                activities={activities}
+                liveStatus={liveStatus}
+              />
             ) : (
               <Navigate to="/login" replace />
             )

@@ -1,5 +1,7 @@
 import express from 'express'
 import cors from 'cors'
+import http from 'http'
+import { WebSocketServer } from 'ws'
 import Database from 'better-sqlite3'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -93,6 +95,25 @@ const app = express()
 app.use(cors({ origin: 'http://localhost:5173', credentials: true }))
 app.use(express.json())
 
+const server = http.createServer(app)
+const wss = new WebSocketServer({ server })
+
+const getCars = () => db.prepare('SELECT id, make, model, year, color, image FROM cars ORDER BY id').all()
+const getActivities = () => db.prepare('SELECT id, title, status, progress, timestamp, description FROM activities ORDER BY id').all()
+
+const broadcast = (payload) => {
+  const message = JSON.stringify(payload)
+  wss.clients.forEach((client) => {
+    if (client.readyState === client.OPEN) {
+      client.send(message)
+    }
+  })
+}
+
+wss.on('connection', (socket) => {
+  socket.send(JSON.stringify({ type: 'sync', cars: getCars(), activities: getActivities() }))
+})
+
 app.get('/api/users', (req, res) => {
   const users = db.prepare('SELECT id, name, email, password FROM users').all()
   res.json(users)
@@ -143,9 +164,38 @@ app.post('/api/cars', (req, res) => {
     const activityResult = insertActivity.run(activityTitle, 'Added', 100, timestamp, 'New car added to fleet')
     const newActivity = db.prepare('SELECT id, title, status, progress, timestamp, description FROM activities WHERE id = ?').get(activityResult.lastInsertRowid)
 
+    broadcast({ type: 'sync', cars: getCars(), activities: getActivities() })
     res.status(201).json({ car: newCar, activity: newActivity })
   } catch (error) {
     res.status(500).json({ message: 'Unable to create car.' })
+  }
+})
+
+app.delete('/api/cars/:id', (req, res) => {
+  const carId = Number(req.params.id)
+  const car = db.prepare('SELECT id, make, model, year, color, image FROM cars WHERE id = ?').get(carId)
+
+  if (!car) {
+    return res.status(404).json({ message: 'Car not found.' })
+  }
+
+  try {
+    db.prepare('DELETE FROM cars WHERE id = ?').run(carId)
+
+    const timestamp = new Date().toLocaleString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    })
+    const activityTitle = `${car.make} ${car.model} removed`
+    const insertActivity = db.prepare('INSERT INTO activities (title, status, progress, timestamp, description) VALUES (?, ?, ?, ?, ?)')
+    const activityResult = insertActivity.run(activityTitle, 'Removed', 50, timestamp, 'Car removed from fleet')
+    const newActivity = db.prepare('SELECT id, title, status, progress, timestamp, description FROM activities WHERE id = ?').get(activityResult.lastInsertRowid)
+
+    broadcast({ type: 'sync', cars: getCars(), activities: getActivities() })
+    res.json({ message: 'Car deleted successfully.', activity: newActivity })
+  } catch (error) {
+    res.status(500).json({ message: 'Unable to delete car.' })
   }
 })
 
@@ -155,6 +205,6 @@ app.get('/api/activities', (req, res) => {
 })
 
 const port = process.env.PORT || 4000
-app.listen(port, () => {
+server.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`)
 })
