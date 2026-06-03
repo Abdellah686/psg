@@ -54,11 +54,11 @@ function CarDetail({ cars, onDeleteCar }: CarDetailProps) {
     )
   }
 
-  const formattedPrice = '$350'
+  const formattedPrice = `$${car.price}`
   const duration = 3
   const insurance = 120
   const delivery = 45
-  const total = 350 * duration + insurance + delivery
+  const total = car.price * duration + insurance + delivery
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">

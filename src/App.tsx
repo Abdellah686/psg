@@ -16,6 +16,7 @@ export type Car = {
   year: number
   color: string
   image: string
+  price: number
 }
 
 export type Activity = {
@@ -44,6 +45,7 @@ const initialCars: Car[] = [
     year: 2024,
     color: 'Midnight Silver',
     image: 'https://images.unsplash.com/photo-1511919884226-fd3cad34687c?auto=format&fit=crop&w=900&q=80',
+    price: 359,
   },
   {
     id: 2,
@@ -52,6 +54,7 @@ const initialCars: Car[] = [
     year: 2023,
     color: 'Alpine White',
     image: 'https://images.unsplash.com/photo-1525609004556-c46c7d6cf023?auto=format&fit=crop&w=900&q=80',
+    price: 329,
   },
   {
     id: 3,
@@ -60,6 +63,7 @@ const initialCars: Car[] = [
     year: 2022,
     color: 'Blue Crush',
     image: 'https://images.unsplash.com/photo-1493238792000-8113da705763?auto=format&fit=crop&w=900&q=80',
+    price: 199,
   },
   {
     id: 4,
@@ -68,6 +72,7 @@ const initialCars: Car[] = [
     year: 2021,
     color: 'Race Red',
     image: 'https://images.unsplash.com/photo-1518655048521-f130df041f66?auto=format&fit=crop&w=900&q=80',
+    price: 279,
   },
 ]
 
@@ -228,7 +233,7 @@ function App() {
     }
   }
 
-  const addCar = async (carData: Omit<Car, 'id'>) => {
+  const addCar = async (carData: Omit<Car, 'id'>): Promise<boolean> => {
     try {
       const response = await fetch('/api/cars', {
         method: 'POST',
@@ -237,17 +242,33 @@ function App() {
         },
         body: JSON.stringify(carData),
       })
+      const responseText = await response.text()
 
       if (!response.ok) {
-        const errorBody = await response.json()
-        throw new Error(errorBody.message || 'Unable to save car.')
+        let errorMessage = 'Unable to save car.'
+        try {
+          const errorBody = JSON.parse(responseText)
+          errorMessage = errorBody.message || errorMessage
+        } catch {
+          errorMessage = responseText || errorMessage
+        }
+        throw new Error(errorMessage)
       }
 
-      const result = await response.json()
-      setCars((prevCars) => [...prevCars, result.car])
-      setActivities((prevActivities) => [...prevActivities, result.activity])
+      const result = responseText ? JSON.parse(responseText) : {}
+      setCars((prevCars) => {
+        if (!result.car || prevCars.some((car) => car.id === result.car.id)) {
+          return prevCars
+        }
+        return [...prevCars, result.car]
+      })
+      if (result.activity) {
+        setActivities((prevActivities) => [...prevActivities, result.activity])
+      }
+      return true
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Unable to save car.')
+      return false
     }
   }
 

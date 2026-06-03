@@ -15,7 +15,8 @@ type DashbordProps = {
     year: number
     color: string
     image: string
-  }) => void
+    price: number
+  }) => Promise<boolean>
   onDeleteCar: (id: number) => void
   onLogout: () => void
   carCount: number
@@ -31,6 +32,7 @@ function Dashbord({ onAddCar, onDeleteCar, onLogout, carCount, cars, activities,
   const [make, setMake] = useState('')
   const [model, setModel] = useState('')
   const [year, setYear] = useState('2025')
+  const [price, setPrice] = useState('350')
   const [color, setColor] = useState('')
   const [image, setImage] = useState('https://images.unsplash.com/photo-1519671482749-fd09be7ccebf?auto=format&fit=crop&w=900&q=80')
 
@@ -89,16 +91,19 @@ function Dashbord({ onAddCar, onDeleteCar, onLogout, carCount, cars, activities,
             </div>
 
           <form
-            onSubmit={(event) => {
+            onSubmit={async (event) => {
               event.preventDefault()
-              onAddCar({
+              const success = await onAddCar({
                 make: make || 'New Make',
                 model: model || 'New Model',
                 year: Number(year) || 2025,
                 color: color || 'Unknown',
                 image,
+                price: Number(price) || 350,
               })
-              navigate('/cars')
+              if (success) {
+                navigate('/cars')
+              }
             }}
             className="mt-6 grid gap-4 sm:grid-cols-2"
           >
@@ -129,6 +134,17 @@ function Dashbord({ onAddCar, onDeleteCar, onLogout, carCount, cars, activities,
                 min="2000"
                 max="2030"
                 className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700">Price</span>
+              <input
+                value={price}
+                onChange={(event) => setPrice(event.target.value)}
+                type="number"
+                min="0"
+                className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200"
+                placeholder="e.g. 350"
               />
             </label>
             <label className="block">
@@ -253,7 +269,10 @@ function Dashbord({ onAddCar, onDeleteCar, onLogout, carCount, cars, activities,
                       <p className="text-sm font-semibold text-slate-900">{car.make} {car.model}</p>
                       <p className="mt-1 text-sm text-slate-500">{car.year} • {car.color}</p>
                     </div>
-                    <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700">#{car.id}</span>
+                    <div className="flex flex-col items-end gap-2 text-right">
+                      <span className="text-sm font-semibold text-slate-900">${car.price}</span>
+                      <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700">#{car.id}</span>
+                    </div>
                   </div>
                 </div>
               ))

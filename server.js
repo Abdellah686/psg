@@ -24,7 +24,8 @@ CREATE TABLE IF NOT EXISTS cars (
   model TEXT NOT NULL,
   year INTEGER NOT NULL,
   color TEXT NOT NULL,
-  image TEXT NOT NULL
+  image TEXT NOT NULL,
+  price INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS activities (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -39,6 +40,11 @@ CREATE TABLE IF NOT EXISTS activities (
 const insertUser = db.prepare('INSERT OR IGNORE INTO users (id, name, email, password) VALUES (?, ?, ?, ?)')
 insertUser.run(1, 'Admin User', 'admin@gmail.com', '1234')
 
+const tableInfo = db.prepare("PRAGMA table_info(cars)").all()
+if (!tableInfo.some((column) => column.name === 'price')) {
+  db.prepare('ALTER TABLE cars ADD COLUMN price INTEGER NOT NULL DEFAULT 0').run()
+}
+
 const initialCars = [
   {
     make: 'Tesla',
@@ -46,6 +52,7 @@ const initialCars = [
     year: 2024,
     color: 'Midnight Silver',
     image: 'https://images.unsplash.com/photo-1511919884226-fd3cad34687c?auto=format&fit=crop&w=900&q=80',
+    price: 359,
   },
   {
     make: 'BMW',
@@ -53,6 +60,7 @@ const initialCars = [
     year: 2023,
     color: 'Alpine White',
     image: 'https://images.unsplash.com/photo-1525609004556-c46c7d6cf023?auto=format&fit=crop&w=900&q=80',
+    price: 329,
   },
   {
     make: 'Toyota',
@@ -60,6 +68,7 @@ const initialCars = [
     year: 2022,
     color: 'Blue Crush',
     image: 'https://images.unsplash.com/photo-1493238792000-8113da705763?auto=format&fit=crop&w=900&q=80',
+    price: 199,
   },
   {
     make: 'Ford',
@@ -67,6 +76,7 @@ const initialCars = [
     year: 2021,
     color: 'Race Red',
     image: 'https://images.unsplash.com/photo-1518655048521-f130df041f66?auto=format&fit=crop&w=900&q=80',
+    price: 279,
   },
 ]
 
@@ -79,11 +89,11 @@ const initialActivities = [
 
 const carsCount = db.prepare('SELECT COUNT(*) AS count FROM cars').get().count
 if (carsCount === 0) {
-  const insertCar = db.prepare('INSERT INTO cars (make, model, year, color, image) VALUES (?, ?, ?, ?, ?)')
+  const insertCar = db.prepare('INSERT INTO cars (make, model, year, color, image, price) VALUES (?, ?, ?, ?, ?, ?)')
   const insertActivity = db.prepare('INSERT INTO activities (title, status, progress, timestamp, description) VALUES (?, ?, ?, ?, ?)')
 
   for (const car of initialCars) {
-    insertCar.run(car.make, car.model, car.year, car.color, car.image)
+    insertCar.run(car.make, car.model, car.year, car.color, car.image, car.price)
   }
 
   for (const activity of initialActivities) {
@@ -93,12 +103,12 @@ if (carsCount === 0) {
 
 const app = express()
 app.use(cors({ origin: 'http://localhost:5173', credentials: true }))
-app.use(express.json())
+app.use(express.json({ limit: '20mb' }))
 
 const server = http.createServer(app)
 const wss = new WebSocketServer({ server })
 
-const getCars = () => db.prepare('SELECT id, make, model, year, color, image FROM cars ORDER BY id').all()
+const getCars = () => db.prepare('SELECT id, make, model, year, color, image, price FROM cars ORDER BY id').all()
 const getActivities = () => db.prepare('SELECT id, title, status, progress, timestamp, description FROM activities ORDER BY id').all()
 
 const broadcast = (payload) => {
@@ -139,20 +149,28 @@ app.post('/api/users', (req, res) => {
 })
 
 app.get('/api/cars', (req, res) => {
-  const cars = db.prepare('SELECT id, make, model, year, color, image FROM cars ORDER BY id').all()
+  const cars = db.prepare('SELECT id, make, model, year, color, image, price FROM cars ORDER BY id').all()
   res.json(cars)
 })
 
 app.post('/api/cars', (req, res) => {
-  const { make, model, year, color, image } = req.body
-  if (!make || !model || !year || !color || !image) {
-    return res.status(400).json({ message: 'Make, model, year, color, and image are required.' })
+  const { make, model, year, color, image, price } = req.body
+  if (!make || !model || !year || !color || !image || price == null) {
+    return res.status(400).json({ message: 'Make, model, year, color, image, and price are required.' })
+  }
+
+  const existingCar = db.prepare(
+    'SELECT id, make, model, year, color, image, price FROM cars WHERE make = ? AND model = ? AND year = ? AND color = ? AND image = ? AND price = ?'
+  ).get(make, model, Number(year), color, image, Number(price))
+
+  if (existingCar) {
+    return res.status(200).json({ car: existingCar, activity: null })
   }
 
   try {
-    const insertCar = db.prepare('INSERT INTO cars (make, model, year, color, image) VALUES (?, ?, ?, ?, ?)')
-    const carResult = insertCar.run(make, model, Number(year), color, image)
-    const newCar = db.prepare('SELECT id, make, model, year, color, image FROM cars WHERE id = ?').get(carResult.lastInsertRowid)
+    const insertCar = db.prepare('INSERT INTO cars (make, model, year, color, image, price) VALUES (?, ?, ?, ?, ?, ?)')
+    const carResult = insertCar.run(make, model, Number(year), color, image, Number(price))
+    const newCar = db.prepare('SELECT id, make, model, year, color, image, price FROM cars WHERE id = ?').get(carResult.lastInsertRowid)
 
     const timestamp = new Date().toLocaleString('en-US', {
       hour: 'numeric',
@@ -173,7 +191,7 @@ app.post('/api/cars', (req, res) => {
 
 app.delete('/api/cars/:id', (req, res) => {
   const carId = Number(req.params.id)
-  const car = db.prepare('SELECT id, make, model, year, color, image FROM cars WHERE id = ?').get(carId)
+  const car = db.prepare('SELECT id, make, model, year, color, image, price FROM cars WHERE id = ?').get(carId)
 
   if (!car) {
     return res.status(404).json({ message: 'Car not found.' })

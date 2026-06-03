@@ -7,6 +7,7 @@ type Car = {
   year: number
   color: string
   image: string
+  price: number
 }
 
 type CarsProps = {
@@ -56,11 +57,13 @@ function Cars({ cars, onLogout }: CarsProps) {
               </div>
               <div className="p-5">
                 <p className="text-sm text-slate-500">{car.year} • {car.color}</p>
-                <div className="mt-4 flex items-center justify-between">
+                <div className="mt-4 flex items-center justify-between gap-3">
                   <span className="rounded-full bg-indigo-100 px-3 py-1 text-sm font-medium text-indigo-700">
-                    {car.color}
+                    ${car.price}
                   </span>
-                  <span className="text-sm font-medium text-slate-500">ID #{car.id}</span>
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-700">
+                    ID #{car.id}
+                  </span>
                 </div>
               </div>
             </Link>
