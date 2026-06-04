@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 type LoginUser = {
   id: number
@@ -82,9 +82,9 @@ function Login({ users, onLogin }: LoginProps) {
         </form>
         <p className="mt-4 text-center text-sm text-slate-500">
           Don't have an account?{' '}
-          <a href="/signup" className="font-semibold text-indigo-600 hover:text-indigo-500">
+          <Link to="/signup" className="font-semibold text-indigo-600 hover:text-indigo-500">
             Sign up
-          </a>
+          </Link>
         </p>
       </div>
     </div>

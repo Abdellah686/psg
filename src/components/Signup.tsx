@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 type SignupProps = {
   onSignUp: (userData: { name: string; email: string; password: string }) => void
@@ -77,9 +77,9 @@ function Signup({ onSignUp }: SignupProps) {
 
           <p className="text-center text-sm text-slate-500">
             Already have an account?{' '}
-            <a href="/login" className="font-semibold text-indigo-600 hover:text-indigo-500">
+            <Link to="/login" className="font-semibold text-indigo-600 hover:text-indigo-500">
               Log in
-            </a>
+            </Link>
           </p>
         </form>
       </div>

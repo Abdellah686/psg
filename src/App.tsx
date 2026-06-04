@@ -316,7 +316,7 @@ function App() {
         </div>
       ) : null}
       <Routes>
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={<Home carCount={cars.length} activityCount={activities.length} liveStatus={liveStatus} />} />
         <Route
           path="/login"
           element={
